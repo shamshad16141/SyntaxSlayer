@@ -6,7 +6,7 @@
       "use": "@vercel/node"
     },
     {
-      "src": "SyntaxSlayer/**/*.html",
+      "src": "SyntaxSlayer/index.html",
       "use": "@vercel/static"
     }
   ],
@@ -14,6 +14,26 @@
     {
       "src": "/api/(.*)",
       "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
+    },
+    {
+      "src": "/save-score",
+      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
+    },
+    {
+      "src": "/leaderboard/(.*)",
+      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
+    },
+    {
+      "src": "/clear-leaderboard",
+      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
+    },
+    {
+      "src": "/css/(.*)",
+      "dest": "SyntaxSlayer/css/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "SyntaxSlayer/assets/$1"
     },
     {
       "src": "/(.*)",
