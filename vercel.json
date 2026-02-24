@@ -1,39 +1,27 @@
 {
   "version": 2,
+  "public": "SyntaxSlayer",
   "builds": [
     {
       "src": "SyntaxSlayer/syntax-slayer-backend/server.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "SyntaxSlayer/index.html",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
-    },
-    {
       "src": "/save-score",
-      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
+      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js",
+      "methods": ["POST"]
     },
     {
       "src": "/leaderboard/(.*)",
-      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
+      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js",
+      "methods": ["GET"]
     },
     {
       "src": "/clear-leaderboard",
-      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js"
-    },
-    {
-      "src": "/css/(.*)",
-      "dest": "SyntaxSlayer/css/$1"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "SyntaxSlayer/assets/$1"
+      "dest": "SyntaxSlayer/syntax-slayer-backend/server.js",
+      "methods": ["DELETE"]
     },
     {
       "src": "/(.*)",
