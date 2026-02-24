@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Syntax Slayer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  
+</head>
+<body>
+  <video id="explosionVideo" src="./assets/video/explosion.mp4" style="display:none;"></video>
+  <div id="startScreen">
+    <h1 class="text">Syntax <br>Slayer</h1>
+    <span class="text-lower">HTML TYPING GAME</span> <br>
+    <div class="button-container" style="flex-direction: column;">
+      <img src="./assets/img/start.png" alt="Endless Mode" onclick="showEndlessMode()" class="game-button">
+      <img src="./assets/img/difficulty.png" alt="Choose Difficulty" onclick="showDifficultyScreen()" class="game-button">
+      <img src="./assets/img/timemode.png" alt="Timed Mode" onclick="showTimedScreen()" class="game-button">
+      <img src="./assets/img/leaderboard.png" alt="Leaderboard" onclick="showLeaderboard()" class="game-button">
+    </div>
+  </div>
+  <div id="difficultyScreen">
+    <h1 class="text">Select Difficulty</h1>
+    <div class="button-container-difficulty" style="flex-direction: column;">
+      <img src="./assets/img/easy.png" alt="Easy Mode" onclick="startGame('easy', 'standard')" class="game-difficulty-button">
+      <img src="./assets/img/medium.png" alt="Medium Mode" onclick="startGame('medium', 'standard')" class="game-difficulty-button">
+      <img src="./assets/img/hard.png" alt="Hard Mode" onclick="startGame('hard', 'standard')" class="game-difficulty-button">
+      <img src="./assets/img/back.png" alt="Back" onclick="showMainMenu()" class="game-difficulty-button">
+    </div>
+  </div>
+  <div id="timedScreen">
+    <h1 class="text">Select Time</h1>
+    <div class="button-container" style="flex-direction: column;">
+      <img src="./assets/img/30s.png" alt="30s Mode" onclick="startGame('medium', 'timed', 30)" class="game-time-button">
+      <img src="./assets/img/60s.png" alt="60s Mode" onclick="startGame('medium', 'timed', 60)" class="game-time-button">
+      <img src="./assets/img/90s.png" alt="90s Mode" onclick="startGame('medium', 'timed', 90)" class="game-time-button">
+      <img src="./assets/img/back.png" alt="Back" onclick="showMainMenu()" class="game-time-button">
+    </div>
+  </div>
+  <div id="leaderboardScreen">
+    <h1 class="text">Leaderboard</h1>
+    <div class="leaderboard-tabs">
+      <button class="leaderboard-tab active" onclick="showLeaderboardTab('standard')">Standard</button>
+      <button class="leaderboard-tab" onclick="showLeaderboardTab('endless')">Endless</button>
+      <button class="leaderboard-tab" onclick="showLeaderboardTab('timed')">Timed</button>
+    </div>
+    <div id="leaderboardContent" class="leaderboard-content">
+    </div>
+    <div class="leaderboard-buttons">
+      <button class="leaderboard-back-btn" onclick="showMainMenu()">Back to Menu</button>
+      <button class="leaderboard-clear-btn" onclick="clearLeaderboard()">Clear Scores</button>
+    </div>
+  </div>
+  <div id="nameInputScreen">
+    <h2 class="text">New High Score!</h2>
+    <p id="beatenPlayerMessage" style="color: #ff00ff; font-family: 'Orbitron', sans-serif; margin-bottom: 20px;"></p>
+    <p>Enter your name:</p>
+    <input type="text" id="playerNameInput" maxlength="15" autocomplete="off">
+    <button onclick="savePlayerScore()">Save Score</button>
+  </div>
+  <div id="scoreValue">Score: 0</div>
+  <div id="difficultyValue">Difficulty: Easy</div>
+  <div id="waveValue">Wave: 1</div>
+  <div id="livesValue"></div>
+  <div id="lifeMessage"></div>
+  <div id="timer">Time: 30s</div>
+  <img src="./assets/img/pause.png" alt="Pause" id="pauseImg" onclick="togglePause()">
+  <canvas id="gameCanvas" width="1200" height="700"></canvas>
+  <input id="input" type="text" autocomplete="off">
+  <div id="gameOver">Game Over<br>Press Enter to Return to Menu</div>
+  <div id="message"></div>
+  <audio id="startSound" src="./assets/audio/start.wav"></audio>
+  <audio id="laserSound" src="./assets/audio/laser2.wav"></audio>
+  <audio id="destroySound" src="./assets/audio/destroy.wav"></audio>
+  <audio id="pauseSound" src="./assets/audio/pause.wav"></audio>
+  <audio id="gameOverSound" src="./assets/audio/gameover.wav"></audio>
+  <audio id="lifeLostSound" src="./assets/audio/lifelost.wav"></audio>
+  <div id="pauseMessage">PAUSED</div>
+  <script>
+    // UUID generation function
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    let lastFrameTime = 0;
+    let deltaTime = 0;
+    let isSavingScore = false; // Flag to prevent multiple score submissions
+    let lastEnterPress = 0;
+    const debounceDelay = 500; // 500ms debounce for Enter key
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreDisplay = document.getElementById('scoreValue');
+    const difficultyDisplay = document.getElementById('difficultyValue');
+    const waveDisplay = document.getElementById('waveValue');
+    const livesDisplay = document.getElementById('livesValue');
+    const timerDisplay = document.getElementById('timer');
+    const gameOverDisplay = document.getElementById('gameOver');
+    const messageDisplay = document.getElementById('message');
+    const input = document.getElementById('input');
+    const startScreen = document.getElementById('startScreen');
+    const difficultyScreen = document.getElementById('difficultyScreen');
+    const timedScreen = document.getElementById('timedScreen');
+    const pauseImg = document.getElementById('pauseImg');
+    const startSound = document.getElementById('startSound');
+    const laserSound = document.getElementById('laserSound');
+    const destroySound = document.getElementById('destroySound');
+    const pauseSound = document.getElementById('pauseSound');
+    const gameOverSound = document.getElementById('gameOverSound');
+    const lifeLostSound = document.getElementById('lifeLostSound');
+    const nameInputScreen = document.getElementById('nameInputScreen');
+
+    startSound.volume = 0.9;
+    laserSound.volume = 0.9;
+    destroySound.volume = 0.9;
+    pauseSound.volume = 0.9;
+    gameOverSound.volume = 0.9;
+    lifeLostSound.volume = 0.9;
+
+    function createStars() {
+      const starCount = 450;
+      for (let i = 0; i < starCount; i++) {
+        const star = document.createElement("div");
+        star.className = "star";
+        star.style.top = `${Math.random() * 100}vh`;
+        star.style.left = `${Math.random() * 100}vw`;
+        star.style.animationDelay = `${Math.random() * 2}s`;
+        star.style.width = star.style.height = `${Math.random() * 2 + 1}px`;
+        document.body.appendChild(star);
+      }
+    }
+
+    createStars();
+
+    let score = 0;
+    let difficulty = 'easy';
+    let gameMode = 'standard';
+    let wave = 1;
+    let dronesPerWave = 5;
+    let dronesDestroyed = 0;
+    let lives = 1;
+    let gameOver = false;
+    let isPaused = false;
+    let gameStarted = false;
+    let enemies = [];
+    let burstLasers = [];
+    let lastSpawn = 0;
+    let activeEnemy = null;
+    let pauseUntil = 0;
+    let timeRemaining = 0;
+    let timeLimit = 0;
+    let timerInterval = null;
+    let difficultyIncreaseInterval = null;
+    let explosions = [];
+    let pendingScore = null;
+    let isHighScorePending = false;
+    const MAX_LEADERBOARD_ENTRIES = 10;
+
+    const player = {
+      x: canvas.width / 2,
+      y: canvas.height - 50,
+      width: 90,
+      height: 120,
+      tilt: 0,
+      targetTilt: 0,
+      maxTilt: 0.8,
+      tiltSpeed: 0.3
+    };
+
+    const playerVideo = document.createElement('video');
+    playerVideo.src = './assets/video/player.mp4';
+    playerVideo.loop = true;
+    playerVideo.muted = true;
+    playerVideo.play().catch(err => console.error('Video play error:', err));
+
+    let videoReady = false;
+    playerVideo.addEventListener('canplay', () => { videoReady = true; });
+
+    const enemyImage = new Image();
+    enemyImage.src = './assets/img/enemy.png';
+    let enemyImageReady = false;
+    enemyImage.onload = () => { enemyImageReady = true; };
+
+    const words = {
+      easy: ['NEON', 'CYBER', 'DRONE', 'HACK', 'DATA'],
+      medium: ['VIRUS', 'NEXUS', 'CODEX', 'GRIDLOCK', 'TECHNO'],
+      hard: ['INFILTRATE', 'OVERCLOCK', 'NEURALNET', 'CRYPTOSYS', 'QUANTUM']
+    };
+
+    const difficultySettings = {
+      easy: { speed: 1, spawnInterval: 2000, lives: 1 },
+      medium: { speed: 1.5, spawnInterval: 1500, lives: 2 },
+      hard: { speed: 2, spawnInterval: 1000, lives: 3 }
+    };
+
+    class Enemy {
+      constructor(word) {
+        this.word = word;
+        this.typed = '';
+        ctx.font = 'bold 20px Orbitron, sans-serif';
+        const textWidth = ctx.measureText(word).width;
+        const horizontalPadding = 100;
+        const safeTextWidth = textWidth + horizontalPadding * 2;
+        const minX = Math.max(safeTextWidth / 2, 50);
+        const maxX = canvas.width - Math.max(safeTextWidth / 2, 50);
+        this.x = Math.random() * (maxX - minX) + minX;
+        this.y = 0;
+        this.exactY = 0;
+        this.speed = difficultySettings[difficulty].speed;
+        this.width = 80;
+        this.height = 80;
+        this.rotation = 0;
+        const rotationMultiplier = 4;
+        this.rotationSpeed = (Math.random() - 0.5) * 0.02 * rotationMultiplier;
+        if (Math.random() > 0.7) {
+          this.rotationSpeed *= 1.5;
+        }
+        this.textWidth = textWidth;
+        this.targetY = 0;
+        this.easingFactor = 0.05;
+      }
+
+      update() {
+    if (isPaused) return;
+    this.exactY += this.speed * (deltaTime / 16.67);
+    this.targetY = this.exactY;
+    this.y += (this.targetY - this.y) * this.easingFactor * (deltaTime / 16.67);
+    this.rotation += this.rotationSpeed * (deltaTime / 16.67);
+    if (this.y + this.height > player.y) {
+      enemies = enemies.filter(enemy => enemy !== this);
+      if (activeEnemy === this) {
+        activeEnemy = null;
+        input.value = '';
+      }
+      lives--;
+      if (lives > 0) {
+        const heartsContainer = livesDisplay;
+        if (heartsContainer.children.length > 0) {
+          const lastHeart = heartsContainer.children[heartsContainer.children.length - 1];
+          lastHeart.classList.add('heart-loss');
+          setTimeout(() => {
+            lastHeart.remove();
+          }, 700);
+        }
+        lifeLostSound.currentTime = 0;
+        lifeLostSound.play().catch(err => console.error('Life lost sound error:', err));
+        const lifeMessage = document.getElementById('lifeMessage');
+        lifeMessage.textContent = 'LIFE LOST!';
+        lifeMessage.style.display = 'block';
+        lifeMessage.style.animation = 'none';
+        lifeMessage.offsetHeight;
+        lifeMessage.style.animation = 'flicker 0.3s infinite';
+        setTimeout(() => {
+          lifeMessage.style.display = 'none';
+        }, 1300);
+        showMessage('LIFE LOST!');
+      }
+      updateGameDisplays();
+      if (lives <= 0) {
+        gameOver = true;
+        gameOverSound.play().catch(err => console.error('Game over sound error:', err));
+        checkHighScore(score, gameMode, difficulty, timeLimit); // Use global variables
+      }
+    }
+  }
+
+      draw() {
+        if (enemyImageReady) {
+          ctx.save();
+          ctx.translate(this.x + this.width/2, this.y + this.height/2);
+          ctx.rotate(this.rotation);
+          ctx.drawImage(
+            enemyImage, 
+            -this.width/2, 
+            -this.height/2, 
+            this.width, 
+            this.height
+          );
+          ctx.restore();
+        } else {
+          ctx.fillStyle = '#ff00ff';
+          ctx.fillRect(this.x, this.y, this.width, this.height);
+          ctx.strokeStyle = '#00ffff';
+          ctx.strokeRect(this.x, this.y, this.width, this.height);
+        }
+        const fontSize = 20;
+        const fontFamily = 'Orbitron, sans-serif';
+        ctx.font = `bold ${fontSize}px ${fontFamily}`;
+        ctx.textAlign = 'center';
+        const textX = this.x + this.width/2;
+        const textY = this.y + this.height/2 + 6;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(this.word, textX, textY);
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        if (this.typed) {
+          ctx.fillStyle = '#fc0303';
+          ctx.textAlign = 'left';
+          const totalWidth = ctx.measureText(this.word).width;
+          const startX = textX - totalWidth/2;
+          ctx.fillText(this.typed, startX, textY);
+          ctx.textAlign = 'center';
+        }
+      }
+    }
+
+    let laserSideToggle = false;
+    class BurstLaser {
+      constructor(target) {
+        laserSideToggle = !laserSideToggle;
+        const laserOffset = 8;
+        this.startX = laserSideToggle ? player.x - laserOffset : player.x + laserOffset;
+        this.startY = player.y - player.height/2;
+        this.target = target;
+        this.endX = target.x + target.width / 2;
+        this.endY = target.y + target.height / 2;
+        this.progress = 0;
+        this.speed = 0.1;
+        this.active = true;
+        this.length = 50;
+        this.totalDistance = Math.sqrt(
+          Math.pow(this.endX - this.startX, 2) + 
+          Math.pow(this.endY - this.startY, 2)
+        );
+        const dx = this.endX - this.startX;
+        const dy = this.endY - this.startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        this.dirX = dx / dist;
+        this.dirY = dy / dist;
+        this.speed = 0.09 + Math.random() * 0.02;
+        const relativeX = this.endX - player.x;
+        const tiltFactor = Math.min(Math.max(relativeX / (canvas.width / 2), -1), 1);
+        player.targetTilt = tiltFactor * player.maxTilt;
+      }
+
+      update() {
+        if (!this.active) return;
+        this.progress += this.speed;
+        const distanceTraveled = this.progress * this.totalDistance;
+        if (distanceTraveled >= this.totalDistance) {
+          this.active = false;
+        }
+      }
+
+      draw() {
+        if (!this.active) return;
+        const distanceTraveled = Math.min(this.progress * this.totalDistance, this.totalDistance);
+        const currentX = this.startX + this.dirX * distanceTraveled;
+        const currentY = this.startY + this.dirY * distanceTraveled;
+        const tailLength = Math.min(this.length, distanceTraveled);
+        const tailX = currentX - this.dirX * tailLength;
+        const tailY = currentY - this.dirY * tailLength;
+        const laserColor = '#ff0000';
+        const glowColor = 'rgba(255, 111, 0, 0.5)';
+        ctx.strokeStyle = laserColor;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(currentX, currentY);
+        ctx.stroke();
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(currentX, currentY);
+        ctx.stroke();
+        ctx.fillStyle = laserColor;
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, 3, 0, Math.PI * 2);
+        ctx.fill();
+        if (distanceTraveled >= this.totalDistance - 5) {
+          ctx.fillStyle = glowColor;
+          ctx.beginPath();
+          ctx.arc(this.endX, this.endY, 8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    class Explosion {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 120;
+        this.height = 120;
+        this.active = true;
+        this.frameIndex = 0;
+        this.video = document.createElement('video');
+        this.video.src = './assets/video/explosion.mp4';
+        this.video.muted = true;
+        this.video.loop = false;
+        this.x = this.x - this.width/2;
+        this.y = this.y - this.height/2;
+        this.video.addEventListener('ended', () => {
+          this.active = false;
+        });
+        this.video.play().catch(err => console.error('Explosion video error:', err));
+      }
+
+      update() {
+        return this.active;
+      }
+
+      draw() {
+        if (this.active && this.video.readyState >= 2) {
+          ctx.drawImage(this.video, this.x, this.y, this.width, this.height);
+        }
+      }
+    }
+
+    function getWord() {
+      const wordList = words[difficulty];
+      return wordList[Math.floor(Math.random() * wordList.length)];
+    }
+
+    function spawnEnemy() {
+      if (pauseUntil > Date.now() || isPaused || enemies.length >= 5) return;
+      const spawnInterval = difficultySettings[difficulty].spawnInterval;
+      if (Date.now() - lastSpawn > spawnInterval) {
+        enemies.push(new Enemy(getWord()));
+        lastSpawn = Date.now();
+      }
+    }
+
+    function startWave() {
+      dronesDestroyed = 0;
+      pauseUntil = Date.now() + 2000;
+      enemies = [];
+      activeEnemy = null;
+      input.value = '';
+      messageDisplay.textContent = `WAVE ${wave}`;
+      messageDisplay.style.display = 'block';
+      messageDisplay.classList.add('message-animation');
+      if (timerInterval) clearInterval(timerInterval);
+      setTimeout(() => {
+        messageDisplay.classList.remove('message-animation');
+        messageDisplay.style.display = 'none';
+        if (gameMode === 'timed' && !isPaused && !gameOver) {
+          timerInterval = setInterval(updateTimer, 1000);
+        }
+      }, 2000);
+      updateGameDisplays();
+    }
+
+    function increaseDifficulty() {
+      if (gameMode !== 'endless' || gameOver || isPaused) return;
+      if (difficulty === 'easy' && wave >= 3) {
+        difficulty = 'medium';
+        lives = difficultySettings[difficulty].lives;
+        showMessage("DIFFICULTY INCREASED TO MEDIUM!");
+      } else if (difficulty === 'medium' && wave >= 6) {
+        difficulty = 'hard';
+        lives = difficultySettings[difficulty].lives;
+        showMessage("DIFFICULTY INCREASED TO HARD!");
+      }
+      difficultySettings[difficulty].speed += 0.1;
+      difficultySettings[difficulty].spawnInterval = Math.max(difficultySettings[difficulty].spawnInterval - 50, 500);
+      dronesPerWave = Math.min(dronesPerWave + 1, 10);
+      updateGameDisplays();
+    }
+
+    function updateGameDisplays() {
+      scoreDisplay.textContent = `Score: ${score}`;
+      difficultyDisplay.textContent = `Difficulty: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`;
+      livesDisplay.innerHTML = '';
+      for (let i = 0; i < lives; i++) {
+        const lifeIcon = document.createElement('img');
+        lifeIcon.src = './assets/img/heart.png';
+        lifeIcon.alt = 'Life';
+        lifeIcon.className = 'life-icon';
+        livesDisplay.appendChild(lifeIcon);
+      }
+      if (gameMode === 'timed') {
+        waveDisplay.textContent = `Time Mode`;
+      } else if (gameMode === 'endless') {
+        waveDisplay.textContent = `Wave: ${wave} | Endless`;
+      } else {
+        waveDisplay.textContent = `Wave: ${wave}`;
+      }
+    }
+
+    function showMessage(text) {
+      messageDisplay.textContent = text;
+      messageDisplay.style.display = 'block';
+      messageDisplay.classList.add('message-animation');
+      setTimeout(() => {
+        messageDisplay.classList.remove('message-animation');
+        messageDisplay.style.display = 'none';
+      }, 2000);
+    }
+
+    function createBurstLaser(target) {
+      burstLasers.push(new BurstLaser(target));
+    }
+
+    function updatePlayerTilt() {
+      if (burstLasers.length === 0 && !activeEnemy) {
+        player.targetTilt = 0;
+      }
+      const tiltDiff = player.targetTilt - player.tilt;
+      if (Math.abs(tiltDiff) > 0.01) {
+        player.tilt += tiltDiff * player.tiltSpeed;
+      } else {
+        player.tilt = player.targetTilt;
+      }
+    }
+
+    input.addEventListener('input', (e) => {
+      if (isPaused || gameOver || pauseUntil > Date.now()) {
+        if (isPaused) {
+          if (activeEnemy) {
+            e.target.value = activeEnemy.typed;
+          } else {
+            e.target.value = '';
+          }
+        }
+        return;
+      }
+      const value = e.target.value.toUpperCase();
+      laserSound.currentTime = 0;
+      laserSound.play().catch(err => console.error('Laser sound error:', err));
+      if (!activeEnemy) {
+        activeEnemy = enemies.find(enemy => enemy.word.startsWith(value));
+      }
+      if (activeEnemy) {
+        activeEnemy.typed = value;
+        createBurstLaser(activeEnemy);
+        if (value === activeEnemy.word) {
+          setTimeout(() => {
+            if (activeEnemy) createBurstLaser(activeEnemy);
+          }, 50);
+          setTimeout(() => {
+            if (activeEnemy) createBurstLaser(activeEnemy);
+          }, 100);
+          setTimeout(() => {
+            if (activeEnemy) {
+              const enemyX = activeEnemy.x + activeEnemy.width/2;
+              const enemyY = activeEnemy.y + activeEnemy.height/2;
+              explosions.push(new Explosion(enemyX, enemyY));
+              enemies = enemies.filter(enemy => enemy !== activeEnemy);
+              score += value.length * 10;
+              dronesDestroyed++;
+              destroySound.play().catch(err => console.error('Destroy sound error:', err));
+              updateGameDisplays();
+              activeEnemy = null;
+              input.value = '';
+              if (dronesDestroyed >= dronesPerWave) {
+                wave++;
+                if (gameMode === 'endless') {
+                  increaseDifficulty();
+                }
+                startWave();
+              }
+            }
+          }, 150);
+        }
+      }
+    });
+
+    function resetGame() {
+      console.log('Resetting game');
+      explosions = [];
+      if (timerInterval) clearInterval(timerInterval);
+      if (difficultyIncreaseInterval) clearInterval(difficultyIncreaseInterval);
+      gameOver = false;
+      gameStarted = false;
+      isPaused = false;
+      isHighScorePending = false;
+      pendingScore = null; // Clear pendingScore
+      canvas.style.display = 'none';
+      input.style.display = 'none';
+      gameOverDisplay.style.display = 'none';
+      messageDisplay.style.display = 'none';
+      timerDisplay.style.display = 'none';
+      pauseImg.style.display = 'none';
+      scoreDisplay.style.display = 'none';
+      difficultyDisplay.style.display = 'none';
+      waveDisplay.style.display = 'none';
+      livesDisplay.style.display = 'none';
+      document.getElementById('pauseMessage').style.display = 'none';
+      startScreen.style.display = 'block';
+      nameInputScreen.style.display = 'none';
+      document.getElementById('leaderboardScreen').style.display = 'none';
+      score = 0;
+      wave = 1;
+      dronesPerWave = 5;
+      dronesDestroyed = 0;
+      lives = 1;
+      enemies = [];
+      burstLasers = [];
+      lastSpawn = 0;
+      pauseUntil = 0;
+      activeEnemy = null;
+      input.value = '';
+      player.tilt = 0;
+      player.targetTilt = 0;
+      timeRemaining = 0;
+      timeLimit = 0;
+      difficultySettings.easy = { speed: 1, spawnInterval: 2000, lives: 1 };
+      difficultySettings.medium = { speed: 1.5, spawnInterval: 1500, lives: 2 };
+      difficultySettings.hard = { speed: 2, spawnInterval: 1000, lives: 3 };
+      playerVideo.play().catch(err => console.error('Restart video error:', err));
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (nameInputScreen.style.display === 'block') {
+          console.log('Enter pressed on name input screen');
+          savePlayerScore();
+        } else if (gameOver && gameStarted) {
+          console.log('Enter pressed on game over screen');
+          resetGame();
+        }
+      }
+      if (e.key === 'Escape' && gameStarted) {
+        togglePause();
+      }
+    });
+
+    document.getElementById('playerNameInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        const now = Date.now();
+        if (now - lastEnterPress < debounceDelay) {
+          console.log('Enter key debounced');
+          return;
+        }
+        lastEnterPress = now;
+        console.log('Enter key pressed in name input');
+        savePlayerScore();
+      }
+    });
+
+    function drawPlayer() {
+      if (videoReady) {
+        ctx.save();
+        ctx.translate(player.x, player.y - player.height / 2);
+        ctx.rotate(player.tilt);
+        ctx.drawImage(
+          playerVideo, 
+          -player.width / 2,
+          -player.height / 2,
+          player.width, 
+          player.height
+        );
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.translate(player.x, player.y - player.height / 2);
+        ctx.rotate(player.tilt);
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+        ctx.strokeStyle = '#ff00ff';
+        ctx.strokeRect(-player.width / 2, -player.height / 2, player.width, player.height);
+        ctx.restore();
+      }
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function gameLoop(currentTime) {
+      if (!gameStarted) {
+        return;
+      }
+      if (isPaused) {
+        return;
+      }
+      if (!lastFrameTime) lastFrameTime = currentTime;
+      deltaTime = currentTime - lastFrameTime;
+      lastFrameTime = currentTime;
+      if (deltaTime > 100) deltaTime = 16.67;
+      drawBackground();
+      if (gameOver && !isHighScorePending && nameInputScreen.style.display !== 'block') {
+        return;
+      }
+      if (pauseUntil <= Date.now()) {
+        spawnEnemy();
+        enemies.forEach(e => e.update());
+        messageDisplay.style.display = 'none';
+      }
+      if (nameInputScreen.style.display !== 'block' && gameOverDisplay.style.display !== 'block') {
+        scoreDisplay.style.display = 'block';
+        difficultyDisplay.style.display = 'block';
+        waveDisplay.style.display = 'block';
+        input.style.display = 'block';
+      } else {
+        scoreDisplay.style.display = 'none';
+        difficultyDisplay.style.display = 'none';
+        waveDisplay.style.display = 'none';
+        input.style.display = 'none';
+      }
+      updatePlayerTilt();
+      drawPlayer();
+      enemies.forEach(e => e.draw());
+      burstLasers.forEach(laser => laser.update());
+      burstLasers.forEach(laser => laser.draw());
+      for (let i = explosions.length - 1; i >= 0; i--) {
+        explosions[i].draw();
+        if (!explosions[i].update()) {
+          explosions.splice(i, 1);
+        }
+      }
+      for (let i = burstLasers.length - 1; i >= 0; i--) {
+        if (!burstLasers[i].active) burstLasers.splice(i, 1);
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    function updateTimer() {
+      if (gameMode !== 'timed' || gameOver || isPaused || pauseUntil > Date.now()) return;
+      timeRemaining--;
+      timerDisplay.textContent = `Time: ${timeRemaining}s`;
+      if (timeRemaining <= 0) {
+        gameOver = true;
+        gameOverSound.play().catch(err => console.error('Game over sound error:', err));
+        checkHighScore(score, mode, difficulty, timeLimit);
+      }
+    }
+
+    function showMainMenu() {
+      console.log('Showing main menu');
+      startScreen.style.display = 'block';
+      difficultyScreen.style.display = 'none';
+      timedScreen.style.display = 'none';
+      document.getElementById('leaderboardScreen').style.display = 'none';
+      nameInputScreen.style.display = 'none';
+      gameOverDisplay.style.display = 'none';
+      pauseImg.style.display = 'none';
+    }
+
+    function showEndlessMode() {
+        console.log('showEndlessMode called');
+        startGame('easy', 'endless');
+    }
+
+    function showDifficultyScreen() {
+      startScreen.style.display = 'none';
+      difficultyScreen.style.display = 'block';
+    }
+
+    function showTimedScreen() {
+      startScreen.style.display = 'none';
+      timedScreen.style.display = 'block';
+    }
+
+    function startGame(selectedDifficulty, selectedMode, time = 0) {
+  console.log('startGame called with:', { selectedDifficulty, selectedMode, time });
+  explosions = [];
+  if (timerInterval) clearInterval(timerInterval);
+  if (difficultyIncreaseInterval) clearInterval(difficultyIncreaseInterval);
+  gameOver = false;
+  gameStarted = true;
+  isPaused = false;
+  isHighScorePending = false;
+  score = 0;
+  wave = 1;
+  dronesPerWave = 5;
+  dronesDestroyed = 0;
+  enemies = [];
+  burstLasers = [];
+  lastSpawn = 0;
+  pauseUntil = 0;
+  activeEnemy = null;
+  input.value = '';
+  player.tilt = 0;
+  player.targetTilt = 0;
+  timeRemaining = 0;
+  timeLimit = 0;
+  difficultySettings.easy = { speed: 1, spawnInterval: 2000, lives: 1 };
+  difficultySettings.medium = { speed: 1.5, spawnInterval: 1500, lives: 2 };
+  difficultySettings.hard = { speed: 2, spawnInterval: 1000, lives: 3 };
+  difficulty = selectedDifficulty;
+  gameMode = selectedMode;
+  timeLimit = time;
+  lives = difficultySettings[difficulty].lives;
+  console.log('Game initialized with:', { difficulty, gameMode, timeLimit, lives }); // Debug log
+  startScreen.style.display = 'none';
+  difficultyScreen.style.display = 'none';
+  timedScreen.style.display = 'none';
+  canvas.style.display = 'block';
+  input.style.display = 'block';
+  input.focus();
+  pauseImg.style.display = 'block';
+  pauseImg.src = './assets/img/pause.png';
+  scoreDisplay.style.display = 'block';
+  difficultyDisplay.style.display = 'block';
+  waveDisplay.style.display = 'block';
+  livesDisplay.style.display = 'block';
+  gameOverDisplay.style.display = 'none';
+  nameInputScreen.style.display = 'none';
+  if (gameMode === 'timed') {
+    timeRemaining = timeLimit;
+    timerDisplay.textContent = `Time: ${timeRemaining}s`;
+    timerDisplay.style.display = 'block';
+  } else {
+    timerDisplay.style.display = 'none';
+  }
+  lastFrameTime = 0;
+  startWave();
+  playerVideo.play().catch(err => console.error('Start video error:', err));
+  startSound.play().catch(err => console.error('Start sound error:', err));
+  requestAnimationFrame(gameLoop);
+}
+
+    function togglePause() {
+      isPaused = !isPaused;
+      pauseImg.src = isPaused ? './assets/img/unpause.png' : './assets/img/pause.png';
+      pauseSound.play().catch(err => console.error('Pause sound error:', err));
+      if (gameOver) return;
+      const pauseMessage = document.getElementById('pauseMessage');
+      pauseMessage.style.display = isPaused ? 'block' : 'none';
+      if (isPaused) {
+        input.blur();
+        input.setAttribute('data-paused-value', input.value);
+        if (timerInterval) clearInterval(timerInterval);
+      } else {
+        setTimeout(() => {
+          input.focus();
+          if (input.hasAttribute('data-paused-value')) {
+            input.value = input.getAttribute('data-paused-value');
+            input.removeAttribute('data-paused-value');
+          }
+        }, 10);
+        lastFrameTime = 0;
+        if (gameMode === 'timed' && pauseUntil <= Date.now()) {
+          timerInterval = setInterval(updateTimer, 1000);
+        }
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    function showLeaderboard() {
+      console.log('Showing leaderboard');
+      startScreen.style.display = 'none';
+      difficultyScreen.style.display = 'none';
+      timedScreen.style.display = 'none';
+      document.getElementById('leaderboardScreen').style.display = 'block';
+      pauseImg.style.display = 'none';
+      showLeaderboardTab('standard');
+    }
+
+    function showLeaderboardTab(mode) {
+      console.log('Showing leaderboard tab:', mode);
+      const tabs = document.querySelectorAll('.leaderboard-tab');
+      tabs.forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.textContent.toLowerCase() === mode) {
+          tab.classList.add('active');
+        }
+      });
+      displayLeaderboard(mode);
+    }
+
+    async function getLeaderboardScores(mode) {
+  try {
+    console.log(`Fetching leaderboard for mode: ${mode}`);
+    if (!mode || !['standard', 'endless', 'timed'].includes(mode)) {
+      console.error('Invalid mode in getLeaderboardScores:', mode);
+      throw new Error('Invalid mode');
+    }
+    const response = await fetch(`http://localhost:3000/leaderboard/${mode}?t=${Date.now()}`, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
+    console.log('Leaderboard fetch status:', response.status, response.statusText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Leaderboard fetch failed:', errorText);
+      throw new Error(`Failed to fetch leaderboard: ${errorText}`);
+    }
+    const scores = await response.json();
+    console.log('Raw leaderboard response:', scores);
+    if (!Array.isArray(scores)) {
+      console.error('Invalid leaderboard response: Expected an array, got:', scores);
+      throw new Error('Invalid leaderboard response format');
+    }
+    const structuredScores = {
+      standard: { easy: [], medium: [], hard: [] },
+      endless: { easy: [], medium: [], hard: [] },
+      timed: { '30': [], '60': [], '90': [] }
+    };
+    scores.forEach(entry => {
+      if (!entry.mode || !entry.difficulty || !entry.name || typeof entry.score !== 'number') {
+        console.warn('Invalid score entry:', entry);
+        return;
+      }
+      const key = entry.mode === 'timed' ? entry.difficulty : entry.difficulty;
+      structuredScores[entry.mode][key].push({
+        name: entry.name,
+        score: entry.score,
+        date: entry.date
+      });
+    });
+    console.log('Structured scores:', structuredScores);
+    return structuredScores;
+  } catch (err) {
+    console.error('Error fetching leaderboard:', err);
+    showMessage('Failed to load leaderboard. Please try again.');
+    return {
+      standard: { easy: [], medium: [], hard: [] },
+      endless: { easy: [], medium: [], hard: [] },
+      timed: { '30': [], '60': [], '90': [] }
+    };
+  }
+}
+
+    async function savePlayerScore() {
+  if (!pendingScore || isSavingScore) {
+    console.log('No pending score or save in progress, skipping');
+    return;
+  }
+  isSavingScore = true;
+  const nameInput = document.getElementById('playerNameInput');
+  const saveButton = nameInputScreen.querySelector('button');
+  saveButton.disabled = true;
+  nameInput.disabled = true;
+  let playerName = nameInput.value.trim();
+  if (!playerName) playerName = 'Anonymous';
+  const { score, mode, difficulty, beatenPlayer } = pendingScore;
+  const transactionId = generateUUID();
+
+  // Validate mode and difficulty before sending
+  if (!mode || !['standard', 'endless', 'timed'].includes(mode)) {
+    console.error('Invalid mode in savePlayerScore:', mode);
+    showMessage('Failed to save score: Invalid game mode');
+    isSavingScore = false;
+    saveButton.disabled = false;
+    nameInput.disabled = false;
+    return;
+  }
+  const validDifficulties = mode === 'timed' ? ['30', '60', '90'] : ['easy', 'medium', 'hard'];
+  if (!difficulty || !validDifficulties.includes(difficulty)) {
+    console.error('Invalid difficulty in savePlayerScore:', difficulty, 'for mode:', mode);
+    showMessage('Failed to save score: Invalid difficulty');
+    isSavingScore = false;
+    saveButton.disabled = false;
+    nameInput.disabled = false;
+    return;
+  }
+
+  try {
+    console.log(`savePlayerScore called with score: ${score}, mode: ${mode}, difficulty: ${difficulty}, transactionId: ${transactionId}`);
+    const payload = {
+      name: playerName,
+      score: score,
+      mode: mode,
+      difficulty: difficulty,
+      date: new Date().toISOString(),
+      transactionId
+    };
+    console.log('Payload sent to server:', payload);
+    const response = await fetch('http://localhost:3000/save-score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (response.ok) {
+      console.log('Score saved successfully');
+      const beatenPlayerMessage = document.getElementById('beatenPlayerMessage');
+      if (beatenPlayer) {
+        beatenPlayerMessage.textContent = `You beat ${beatenPlayer}'s score!`;
+      } else {
+        beatenPlayerMessage.textContent = 'You set a new record!';
+      }
+      pendingScore = null;
+      isHighScorePending = false;
+      nameInput.value = '';
+      nameInputScreen.style.display = 'none';
+      startScreen.style.display = 'none';
+      difficultyScreen.style.display = 'none';
+      timedScreen.style.display = 'none';
+      document.getElementById('leaderboardScreen').style.display = 'block';
+      pauseImg.style.display = 'none';
+      showLeaderboardTab(mode);
+    } else {
+      const error = await response.json();
+      console.error('Failed to save score:', error.error);
+      showMessage(`Failed to save score: ${error.error}`);
+    }
+  } catch (err) {
+    console.error('Error saving score:', err);
+    showMessage('Failed to save score. Please try again.');
+  } finally {
+    isSavingScore = false;
+    saveButton.disabled = false;
+    nameInput.disabled = false;
+  }
+}
+
+    async function clearLeaderboard() {
+      if (confirm('Are you sure you want to clear all leaderboard scores?')) {
+        try {
+          const response = await fetch('http://localhost:3000/clear-leaderboard', {
+            method: 'DELETE'
+          });
+          if (response.ok) {
+            console.log('Leaderboard cleared');
+            const tabs = document.querySelectorAll('.leaderboard-tab');
+            let activeTab = 'standard';
+            tabs.forEach(tab => {
+              if (tab.classList.contains('active')) {
+                activeTab = tab.textContent.toLowerCase();
+              }
+            });
+            displayLeaderboard(activeTab);
+          } else {
+            console.error('Failed to clear leaderboard');
+            showMessage('Failed to clear leaderboard. Please try again.');
+          }
+        } catch (err) {
+          console.error('Error clearing leaderboard:', err);
+          showMessage('Failed to clear leaderboard. Please try again.');
+        }
+      }
+    }
+
+    async function checkHighScore(score, mode, difficulty, timeLimit) {
+  if (isHighScorePending) {
+    console.log('High score check already in progress, skipping');
+    return;
+  }
+  // Validate mode
+  if (!mode || !['standard', 'endless', 'timed'].includes(mode)) {
+    console.error('Invalid mode in checkHighScore:', mode);
+    gameOverDisplay.innerHTML = `Game Over!<br>Final Score: ${score}<br>Press Enter to Return to Menu<br>Error: Invalid game mode`;
+    gameOverDisplay.style.display = 'block';
+    nameInputScreen.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    difficultyDisplay.style.display = 'none';
+    waveDisplay.style.display = 'none';
+    input.style.display = 'none';
+    pauseImg.style.display = 'none';
+    isHighScorePending = false;
+    return;
+  }
+  // Validate difficulty
+  let validDifficulties = mode === 'timed' ? ['medium'] : ['easy', 'medium', 'hard'];
+  if (mode === 'timed' && (!timeLimit || !['30', '60', '90'].includes(timeLimit.toString()))) {
+    console.error('Invalid timeLimit in checkHighScore:', timeLimit, 'for mode:', mode);
+    gameOverDisplay.innerHTML = `Game Over!<br>Final Score: ${score}<br>Press Enter to Return to Menu<br>Error: Invalid time limit`;
+    gameOverDisplay.style.display = 'block';
+    nameInputScreen.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    difficultyDisplay.style.display = 'none';
+    waveDisplay.style.display = 'none';
+    input.style.display = 'none';
+    pauseImg.style.display = 'none';
+    isHighScorePending = false;
+    return;
+  }
+  if (!difficulty || !validDifficulties.includes(difficulty)) {
+    console.error('Invalid difficulty in checkHighScore:', difficulty, 'for mode:', mode);
+    gameOverDisplay.innerHTML = `Game Over!<br>Final Score: ${score}<br>Press Enter to Return to Menu<br>Error: Invalid difficulty`;
+    gameOverDisplay.style.display = 'block';
+    nameInputScreen.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    difficultyDisplay.style.display = 'none';
+    waveDisplay.style.display = 'none';
+    input.style.display = 'none';
+    pauseImg.style.display = 'none';
+    isHighScorePending = false;
+    return;
+  }
+
+  console.log('Checking high score:', score, 'Mode:', mode, 'Difficulty:', difficulty, 'Time Limit:', timeLimit);
+  let allScores;
+  try {
+    allScores = await getLeaderboardScores(mode);
+    console.log('Fetched leaderboard scores:', allScores);
+  } catch (err) {
+    console.error('Error in checkHighScore:', err);
+    gameOverDisplay.innerHTML = `Game Over!<br>Final Score: ${score}<br>Press Enter to Return to Menu<br>Error: Could not connect to leaderboard`;
+    gameOverDisplay.style.display = 'block';
+    nameInputScreen.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    difficultyDisplay.style.display = 'none';
+    waveDisplay.style.display = 'none';
+    input.style.display = 'none';
+    pauseImg.style.display = 'none';
+    isHighScorePending = false;
+    return;
+  }
+
+  let isHighScore = false;
+  let beatenPlayer = null;
+  let key = mode === 'timed' ? timeLimit.toString() : difficulty;
+
+  if (score <= 0) {
+    console.log('Score is 0, not eligible for high score');
+    gameOverDisplay.innerHTML = `Game Over!<br>Final Score: ${score}<br>Press Enter to Return to Menu`;
+    gameOverDisplay.style.display = 'block';
+    nameInputScreen.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    difficultyDisplay.style.display = 'none';
+    waveDisplay.style.display = 'none';
+    input.style.display = 'none';
+    pauseImg.style.display = 'none';
+    isHighScorePending = false;
+    return;
+  }
+
+  let modeScores;
+  if (mode === 'standard' || mode === 'endless') {
+    modeScores = allScores[mode][difficulty] || [];
+    if (!allScores[mode][difficulty]) {
+      allScores[mode][difficulty] = [];
+    }
+  } else if (mode === 'timed') {
+    modeScores = allScores[mode][key] || [];
+    if (!allScores[mode][key]) {
+      allScores[mode][key] = [];
+    }
+  }
+
+  if (modeScores.length === 0) {
+    isHighScore = true;
+  } else {
+    const minScore = Math.min(...modeScores.map(entry => entry.score));
+    const maxScore = Math.max(...modeScores.map(entry => entry.score));
+    const sortedScores = [...modeScores].sort((a, b) => b.score - a.score);
+
+    if (score > maxScore) {
+      isHighScore = true;
+      beatenPlayer = sortedScores[0].name;
+    } else if (modeScores.length < MAX_LEADERBOARD_ENTRIES) {
+      const beatenEntry = sortedScores.find(entry => score > entry.score);
+      if (beatenEntry) {
+        isHighScore = true;
+        beatenPlayer = beatenEntry.name;
+      }
+    } else if (score > minScore) {
+      const beatenEntry = sortedScores.find(entry => score > entry.score);
+      if (beatenEntry) {
+        isHighScore = true;
+        beatenPlayer = beatenEntry.name;
+      }
+    }
+  }
+
+  if (isHighScore) {
+    pendingScore = {
+      score: score,
+      mode: mode,
+      difficulty: mode === 'timed' ? timeLimit.toString() : difficulty, // Use timeLimit for timed mode
+      beatenPlayer: beatenPlayer
+    };
+    console.log('High score detected, pendingScore set:', pendingScore);
+    isHighScorePending = true;
+    const highScoreMessage = document.querySelector('#nameInputScreen h2');
+    highScoreMessage.textContent = `New High Score: ${score}!`;
+    nameInputScreen.style.display = 'block';
+    gameOverDisplay.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    difficultyDisplay.style.display = 'none';
+    waveDisplay.style.display = 'none';
+    input.style.display = 'none';
+    pauseImg.style.display = 'none';
+    const beatenPlayerMessage = document.getElementById('beatenPlayerMessage');
+    beatenPlayerMessage.style.display = 'block';
+    beatenPlayerMessage.textContent = beatenPlayer
+      ? `You beat ${beatenPlayer}'s score!`
+      : 'You set a new record!';
+    document.getElementById('playerNameInput').focus();
+  } else {
+    console.log('Not a high score');
+    gameOverDisplay.innerHTML = `Game Over!<br>Final Score: ${score}<br>Press Enter to Return to Menu`;
+    gameOverDisplay.style.display = 'block';
+    nameInputScreen.style.display = 'none';
+    scoreDisplay.style.display = 'none';
+    difficultyDisplay.style.display = 'none';
+    waveDisplay.style.display = 'none';
+    input.style.display = 'none';
+    pauseImg.style.display = 'none';
+    isHighScorePending = false;
+  }
+}
+
+    function updateStartScreen() {
+      const buttonContainer = document.querySelector('#startScreen .button-container');
+      const existingButton = Array.from(buttonContainer.children).find(
+        child => child.alt === 'Leaderboard'
+      );
+      if (!existingButton) {
+        const leaderboardButton = document.createElement('img');
+        leaderboardButton.src = './assets/img/leaderboard.png';
+        leaderboardButton.alt = 'Leaderboard';
+        leaderboardButton.onclick = showLeaderboard;
+        leaderboardButton.className = 'game-button';
+        buttonContainer.appendChild(leaderboardButton);
+      }
+    }
+
+    async function displayLeaderboard(mode) {
+      const leaderboardContent = document.getElementById('leaderboardContent');
+      leaderboardContent.innerHTML = '<div class="no-scores-message">Loading scores...</div>';
+      const allScores = await getLeaderboardScores(mode);
+      console.log('Displaying leaderboard for mode:', mode, 'Scores:', allScores[mode]);
+      leaderboardContent.innerHTML = '';
+      const modeScores = allScores[mode];
+      if (!modeScores) {
+        leaderboardContent.innerHTML = '<div class="no-scores-message">No scores available</div>';
+        console.log('No scores for mode:', mode);
+        return;
+      }
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'leaderboard-item';
+      headerDiv.style.borderBottom = '2px solid #00ffff';
+      headerDiv.style.fontWeight = 'bold';
+      headerDiv.style.color = '#00ffff';
+      headerDiv.innerHTML = `
+        <div class="leaderboard-rank">#</div>
+        <div class="leaderboard-name">Name</div>
+        <div class="leaderboard-score">Score</div>
+        <div class="leaderboard-difficulty">${mode === 'timed' ? 'Time' : 'Difficulty'}</div>
+      `;
+      leaderboardContent.appendChild(headerDiv);
+      let hasScores = false;
+      if (mode === 'standard' || mode === 'endless') {
+        ['easy', 'medium', 'hard'].forEach(diff => {
+          if (modeScores[diff] && modeScores[diff].length > 0) {
+            hasScores = true;
+            const diffHeader = document.createElement('div');
+            diffHeader.className = 'leaderboard-item';
+            diffHeader.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            diffHeader.style.padding = '5px';
+            diffHeader.style.color = '#ff00ff';
+            diffHeader.innerHTML = `<div style="width:100%; text-align:center;">${diff.toUpperCase()}</div>`;
+            leaderboardContent.appendChild(diffHeader);
+            modeScores[diff].sort((a, b) => b.score - a.score).forEach((entry, index) => {
+              const item = document.createElement('div');
+              item.className = 'leaderboard-item';
+              item.innerHTML = `
+                <div class="leaderboard-rank">${index + 1}</div>
+                <div class="leaderboard-name">${entry.name}</div>
+                <div class="leaderboard-score">${entry.score}</div>
+                <div class="leaderboard-difficulty">${diff}</div>
+              `;
+              leaderboardContent.appendChild(item);
+            });
+          }
+        });
+      } else if (mode === 'timed') {
+        ['30', '60', '90'].forEach(time => {
+          if (modeScores[time] && modeScores[time].length > 0) {
+            hasScores = true;
+            const timeHeader = document.createElement('div');
+            timeHeader.className = 'leaderboard-item';
+            timeHeader.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            timeHeader.style.padding = '5px';
+            timeHeader.style.color = '#ff00ff';
+            timeHeader.innerHTML = `<div style="width:100%; text-align:center;">${time} SECONDS</div>`;
+            leaderboardContent.appendChild(timeHeader);
+            modeScores[time].sort((a, b) => b.score - a.score).forEach((entry, index) => {
+              const item = document.createElement('div');
+              item.className = 'leaderboard-item';
+              item.innerHTML = `
+                <div class="leaderboard-rank">${index + 1}</div>
+                <div class="leaderboard-name">${entry.name}</div>
+                <div class="leaderboard-score">${entry.score}</div>
+                <div class="leaderboard-difficulty">${time}s</div>
+              `;
+              leaderboardContent.appendChild(item);
+            });
+          }
+        });
+      }
+      if (!hasScores) {
+        leaderboardContent.innerHTML += '<div class="no-scores-message">No scores yet.<br>Play a game to set a record!</div>';
+        console.log('No scores displayed for mode:', mode);
+      }
+    }
+
+    updateStartScreen();
+  </script> 
+</body>
+</html>
