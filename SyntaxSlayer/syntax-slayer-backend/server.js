@@ -1,17 +1,19 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const path = require('path');
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Enable CORS to allow communication with your frontend
 app.use(cors());
 app.use(express.json());
 
 // Connect to SQLite database
-const db = new sqlite3.Database('leaderboard.db', (err) => {
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'leaderboard.db');
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) console.error('Database connection error:', err);
-  else console.log('Connected to SQLite database');
+  else console.log('Connected to SQLite database at:', dbPath);
 });
 
 // Create leaderboard table
@@ -95,5 +97,7 @@ app.delete('/clear-leaderboard', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  c
+
+module.exports = app;onsole.log(`Server running at http://localhost:${port}`);
 });

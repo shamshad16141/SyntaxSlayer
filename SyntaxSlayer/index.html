@@ -868,7 +868,8 @@
       console.error('Invalid mode in getLeaderboardScores:', mode);
       throw new Error('Invalid mode');
     }
-    const response = await fetch(`http://localhost:3000/leaderboard/${mode}?t=${Date.now()}`, {
+    const API_BASE = window.location.origin;
+    const response = await fetch(`${API_BASE}/leaderboard/${mode}?t=${Date.now()}`, {
       method: 'GET',
       headers: {
         'Cache-Control': 'no-cache'
@@ -961,7 +962,8 @@
       transactionId
     };
     console.log('Payload sent to server:', payload);
-    const response = await fetch('http://localhost:3000/save-score', {
+    const API_BASE = window.location.origin;
+    const response = await fetch(`${API_BASE}/save-score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1002,7 +1004,8 @@
     async function clearLeaderboard() {
       if (confirm('Are you sure you want to clear all leaderboard scores?')) {
         try {
-          const response = await fetch('http://localhost:3000/clear-leaderboard', {
+          const API_BASE = window.location.origin;
+          const response = await fetch(`${API_BASE}/clear-leaderboard`, {
             method: 'DELETE'
           });
           if (response.ok) {
